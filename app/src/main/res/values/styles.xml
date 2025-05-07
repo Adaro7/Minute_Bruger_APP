@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Widget.MinuteBurgers.DropDown" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+        <item name="boxStrokeColor">@color/minute_burger_orange</item>
+        <item name="hintTextColor">@color/minute_burger_orange</item>
+        <item name="android:textColorHint">@color/minute_burger_orange</item>
+    </style>
+</resources> 
