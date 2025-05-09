@@ -1,10 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Our custom brand colors -->
-    <color name="minute_burger_orange">#FFA500</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
-    <color name="gray">#757575</color>
+    <!-- Our custom brand colors - Modern Aesthetic Palette -->
+    <color name="minute_burger_orange">#FF7043</color> <!-- Main brand color - Vibrant orange -->
+    <color name="minute_burger_orange_light">#FFAB91</color> <!-- Lighter orange for accents -->
+    <color name="minute_burger_orange_dark">#D84315</color> <!-- Dark orange for emphasis -->
+    <color name="primary_dark">#263238</color> <!-- Dark blue-gray for headers -->
+    <color name="secondary_color">#455A64</color> <!-- Blue-gray for secondary elements -->
+    <color name="accent_color">#00BCD4</color> <!-- Teal accent for highlights -->
+    <color name="background_light">#FAFAFA</color> <!-- Very light gray for backgrounds -->
+    <color name="background_dark">#37474F</color> <!-- Dark blue-gray for dark mode -->
+    <color name="black">#212121</color> <!-- Soft black for text -->
+    <color name="white">#FFFFFF</color> <!-- Pure white -->
+    <color name="gray">#757575</color> <!-- Medium gray for secondary text -->
+    <color name="light_gray">#ECEFF1</color> <!-- Very light gray for dividers -->
+    <color name="dark_gray">#455A64</color> <!-- Dark gray for emphasis -->
+    <color name="success_green">#26A69A</color> <!-- Teal-green for success states -->
+    <color name="error_red">#EF5350</color> <!-- Soft red for errors -->
+    <color name="warning_yellow">#FFCA28</color> <!-- Amber for warnings -->
 
     <!-- Required theme colors -->
     <color name="purple_200">#FFBB86FC</color>
@@ -13,5 +25,6 @@
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_700">#FF018786</color>
 
-    <color name="orange">#FFA500</color>
+    <color name="orange">#FF8C00</color>
+    <color name="colorAccent">#FF7043</color>
 </resources>

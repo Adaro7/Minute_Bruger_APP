@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="8dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:cardBackgroundColor="@color/white"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="4dp"
+    app:cardPreventCornerOverlap="true"
+    app:cardUseCompatPadding="true"
+    app:rippleColor="@color/minute_burger_orange_light">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <!-- Status indicator -->
+        <View
+            android:id="@+id/statusIndicator"
+            android:layout_width="4dp"
+            android:layout_height="0dp"
+            android:background="@color/gray"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Content container -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/statusIndicator"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <!-- Header section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/itemName"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/black"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    tools:text="Burger Patties" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:textAllCaps="true"
+                    android:textColor="@color/white"
+                    android:textSize="12sp"
+                    app:chipBackgroundColor="@color/gray"
+                    tools:text="PENDING" />
+            </LinearLayout>
+
+            <!-- Quantity -->
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/quantity"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:drawableStart="@android:drawable/ic_menu_sort_by_size"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/minute_burger_orange"
+                android:gravity="center_vertical"
+                android:textColor="@color/gray"
+                android:textSize="14sp"
+                tools:text="Quantity: 50" />
+
+            <!-- Requested by -->
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/requestedBy"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:drawableStart="@android:drawable/ic_menu_myplaces"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/minute_burger_orange"
+                android:gravity="center_vertical"
+                android:textColor="@color/gray"
+                android:textSize="14sp"
+                tools:text="Requested by: John Doe" />
+
+            <!-- Branch -->
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/branch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:drawableStart="@android:drawable/ic_menu_compass"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/minute_burger_orange"
+                android:gravity="center_vertical"
+                android:textColor="@color/gray"
+                android:textSize="14sp"
+                tools:text="Branch: Main Street" />
+
+            <!-- Date -->
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/requestDate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:drawableStart="@android:drawable/ic_menu_my_calendar"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/minute_burger_orange"
+                android:gravity="center_vertical"
+                android:textColor="@color/gray"
+                android:textSize="14sp"
+                tools:text="Date: Jan 01, 2023 10:30" />
+
+            <!-- Notes -->
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/notes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@color/light_gray"
+                android:drawableStart="@android:drawable/ic_menu_info_details"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/minute_burger_orange"
+                android:gravity="center_vertical"
+                android:padding="8dp"
+                android:textColor="@color/gray"
+                android:textSize="14sp"
+                android:visibility="gone"
+                app:cornerRadius="8dp"
+                tools:text="Notes: Urgent request for weekend event"
+                tools:visibility="visible" />
+
+            <!-- Action buttons -->
+            <LinearLayout
+                android:id="@+id/actionButtonsLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/rejectButton"
+                    style="@style/Widget.MinuteBurgers.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:text="Reject"
+                    android:textAllCaps="false"
+                    android:textColor="@color/error_red"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="@color/error_red" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/approveButton"
+                    style="@style/Widget.MinuteBurgers.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Approve"
+                    android:textAllCaps="false"
+                    app:cornerRadius="12dp" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</com.google.android.material.card.MaterialCardView>

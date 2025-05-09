@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Minute Burgers</string>
-    <string name="default_web_client_id">469900893337-tcbjt8bh4k18kqe50brc70m29b0su526.apps.googleusercontent.com</string>
+    <string name="default_web_client_id">469900893337-3vf8hgp1qdlbkpst8lptgv2v9o9uld7g.apps.googleusercontent.com</string>
+    <string name="firebase_api_key">AIzaSyBQPYnO1CgsY9qRCrVN9WnP-NZEPpGwerQ</string>
+    <string name="firebase_domain">minuteburgers.firebaseapp.com</string>
 </resources>

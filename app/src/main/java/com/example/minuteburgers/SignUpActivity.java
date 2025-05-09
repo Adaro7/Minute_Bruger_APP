@@ -3,12 +3,15 @@ package com.example.minuteburgers;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Toast;
 import android.view.View;
 import android.widget.ProgressBar;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.minuteburgers.models.User;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -18,6 +21,7 @@ import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -32,13 +36,16 @@ public class SignUpActivity extends AppCompatActivity {
     private static final String TAG = "SignUpActivity";
     private static final int RC_SIGN_IN = 9001;
 
-    private TextInputEditText nameEditText, emailEditText, passwordEditText;
+    private TextInputEditText nameEditText, emailEditText, passwordEditText, branchEditText;
+    private AutoCompleteTextView roleDropdown;
+    private TextInputLayout roleInputLayout;
     private MaterialButton signUpButton;
     private SignInButton googleSignUpButton;
     private ProgressBar progressBar;
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
     private GoogleSignInClient mGoogleSignInClient;
+    private String selectedRole = "employee"; // Default role
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,9 +74,15 @@ public class SignUpActivity extends AppCompatActivity {
         nameEditText = findViewById(R.id.nameEditText);
         emailEditText = findViewById(R.id.emailEditText);
         passwordEditText = findViewById(R.id.passwordEditText);
+        branchEditText = findViewById(R.id.branchEditText);
+        roleDropdown = findViewById(R.id.roleDropdown);
+        roleInputLayout = findViewById(R.id.roleInputLayout);
         signUpButton = findViewById(R.id.signUpButton);
         googleSignUpButton = findViewById(R.id.googleSignUpButton);
         progressBar = findViewById(R.id.progressBar);
+
+        // Setup role dropdown
+        setupRoleDropdown();
 
         // Set click listeners
         signUpButton.setOnClickListener(v -> handleEmailSignUp());
@@ -83,6 +96,23 @@ public class SignUpActivity extends AppCompatActivity {
         mGoogleSignInClient.signOut();
     }
 
+    private void setupRoleDropdown() {
+        // Only allow employee role - owner is added directly to database
+        String[] roles = new String[]{"Employee"};
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_dropdown_item_1line, roles);
+        roleDropdown.setAdapter(adapter);
+
+        // Set default selection
+        roleDropdown.setText("Employee", false);
+
+        // Always set role to employee
+        selectedRole = "employee";
+
+        // No need for listener since there's only one option
+        roleDropdown.setEnabled(false); // Disable dropdown since there's only one option
+    }
+
     private void showLoading(boolean show) {
         signUpButton.setVisibility(show ? View.INVISIBLE : View.VISIBLE);
         progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
@@ -90,21 +120,29 @@ public class SignUpActivity extends AppCompatActivity {
         nameEditText.setEnabled(!show);
         emailEditText.setEnabled(!show);
         passwordEditText.setEnabled(!show);
+        branchEditText.setEnabled(!show);
+        roleDropdown.setEnabled(!show);
     }
 
     private void handleEmailSignUp() {
         String name = nameEditText.getText().toString().trim();
         String email = emailEditText.getText().toString().trim();
         String password = passwordEditText.getText().toString().trim();
+        String branch = branchEditText.getText().toString().trim();
 
         // Validate inputs
         if (name.isEmpty() || email.isEmpty() || password.isEmpty()) {
-            Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Please fill in all required fields", Toast.LENGTH_SHORT).show();
             return;
         }
 
         if (password.length() < 6) {
             Toast.makeText(this, "Password must be at least 6 characters long", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (branch.isEmpty()) {
+            Toast.makeText(this, "Please enter your branch", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -116,14 +154,14 @@ public class SignUpActivity extends AppCompatActivity {
         checkIfUserExists(email, exists -> {
             if (exists) {
                 showLoading(false);
-                Toast.makeText(SignUpActivity.this, 
-                    "This email is already registered. Please log in instead.", 
+                Toast.makeText(SignUpActivity.this,
+                    "This email is already registered. Please log in instead.",
                     Toast.LENGTH_LONG).show();
                 return;
             }
 
             // Create user with email and password
-            createUserWithEmail(name, email, password);
+            createUserWithEmail(name, email, password, branch, selectedRole);
         });
     }
 
@@ -150,19 +188,25 @@ public class SignUpActivity extends AppCompatActivity {
             try {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
                 Log.d(TAG, "Google Sign In successful. Email: " + account.getEmail());
-                
+
                 // Check if the Google account is already registered
                 checkIfUserExists(account.getEmail(), exists -> {
                     if (exists) {
                         showLoading(false);
-                        Toast.makeText(SignUpActivity.this, 
-                            "This Google account is already registered. Please log in instead.", 
+                        Toast.makeText(SignUpActivity.this,
+                            "This Google account is already registered. Please log in instead.",
                             Toast.LENGTH_LONG).show();
                         return;
                     }
 
                     // Create new user with Google account
-                    firebaseAuthWithGoogle(account.getIdToken(), account.getDisplayName());
+                    String branch = branchEditText.getText().toString().trim();
+                    if (branch.isEmpty()) {
+                        showLoading(false);
+                        Toast.makeText(SignUpActivity.this, "Please enter your branch", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    firebaseAuthWithGoogle(account.getIdToken(), account.getDisplayName(), branch, selectedRole);
                 });
             } catch (ApiException e) {
                 Log.e(TAG, "Google sign in failed", e);
@@ -181,25 +225,25 @@ public class SignUpActivity extends AppCompatActivity {
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Error checking user existence", e);
-                    Toast.makeText(SignUpActivity.this, 
-                        "Error checking user account: " + e.getMessage(), 
+                    Toast.makeText(SignUpActivity.this,
+                        "Error checking user account: " + e.getMessage(),
                         Toast.LENGTH_SHORT).show();
                     callback.onResult(false);
                 });
     }
 
-    private void createUserWithEmail(String name, String email, String password) {
+    private void createUserWithEmail(String name, String email, String password, String branch, String role) {
         mAuth.createUserWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
                         FirebaseUser user = mAuth.getCurrentUser();
                         if (user != null) {
-                            createUserProfile(user.getUid(), name, email);
+                            createUserProfile(user.getUid(), name, email, branch, role);
                         }
                     } else {
                         showLoading(false);
                         Log.e(TAG, "createUserWithEmail:failure", task.getException());
-                        String errorMessage = task.getException() != null ? 
+                        String errorMessage = task.getException() != null ?
                             task.getException().getMessage() : "Unknown error occurred";
                         Toast.makeText(SignUpActivity.this,
                                 "Registration failed: " + errorMessage,
@@ -208,37 +252,46 @@ public class SignUpActivity extends AppCompatActivity {
                 });
     }
 
-    private void firebaseAuthWithGoogle(String idToken, String name) {
+    private void firebaseAuthWithGoogle(String idToken, String name, String branch, String role) {
         AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
         mAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
                         FirebaseUser user = mAuth.getCurrentUser();
                         if (user != null) {
-                            createUserProfile(user.getUid(), name, user.getEmail());
+                            createUserProfile(user.getUid(), name, user.getEmail(), branch, role);
                         }
                     } else {
                         showLoading(false);
                         Log.e(TAG, "signInWithCredential:failure", task.getException());
-                        Toast.makeText(SignUpActivity.this, 
+                        Toast.makeText(SignUpActivity.this,
                             "Authentication failed: " + task.getException().getMessage(),
                             Toast.LENGTH_SHORT).show();
                     }
                 });
     }
 
+    // Legacy method for backward compatibility
     private void createUserProfile(String userId, String name, String email) {
+        createUserProfile(userId, name, email, "", "employee");
+    }
+
+    private void createUserProfile(String userId, String name, String email, String branch, String role) {
+        User user = new User(userId, name, email, role, branch);
+        user.setRegistrationDate(new Date());
+
         Map<String, Object> userProfile = new HashMap<>();
         userProfile.put("name", name);
         userProfile.put("email", email);
-        userProfile.put("role", "staff");
+        userProfile.put("role", role);
+        userProfile.put("branch", branch);
         userProfile.put("registrationDate", new Date());
 
         db.collection("users")
                 .document(userId)
                 .set(userProfile)
                 .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "User profile created for: " + email);
+                    Log.d(TAG, "User profile created for: " + email + " with role: " + role);
                     showLoading(false);
                     Toast.makeText(SignUpActivity.this,
                             "Account created successfully!",
@@ -249,8 +302,8 @@ public class SignUpActivity extends AppCompatActivity {
                 .addOnFailureListener(e -> {
                     showLoading(false);
                     Log.e(TAG, "Error creating user profile", e);
-                    Toast.makeText(SignUpActivity.this, 
-                        "Error creating user profile: " + e.getMessage(), 
+                    Toast.makeText(SignUpActivity.this,
+                        "Error creating user profile: " + e.getMessage(),
                         Toast.LENGTH_LONG).show();
                 });
     }
@@ -260,4 +313,3 @@ public class SignUpActivity extends AppCompatActivity {
     }
 }
 
- 

@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<paths>
-    <cache-path
-        name="reports"
-        path="." />
-</paths> 
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Internal app storage -->
+    <cache-path name="cache" path="." />
+    <files-path name="files" path="." />
+
+    <!-- External storage -->
+    <external-path name="external" path="." />
+    <external-files-path name="external_files" path="." />
+    <external-cache-path name="external_cache" path="." />
+
+    <!-- Specific paths -->
+    <external-path name="downloads" path="Download" />
+    <external-files-path name="reports" path="Documents/reports" />
+    <external-files-path name="downloads_files" path="Download" />
+
+    <!-- For Android 10+ -->
+    <external-media-path name="media" path="." />
+</paths>

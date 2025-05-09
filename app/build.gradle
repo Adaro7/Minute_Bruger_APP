@@ -24,8 +24,26 @@ android {
         }
     }
     compileOptions {
+        // Keep Java 8 for compatibility
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    // Add packaging options to resolve conflicts
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/NOTICE.md', 'META-INF/LICENSE.md', 'META-INF/DEPENDENCIES']
+            pickFirsts += ['META-INF/NOTICE', 'META-INF/LICENSE', 'META-INF/mailcap.default', 'META-INF/mimetypes.default']
+        }
+    }
+
+    // Fix for "is not on the classpath" errors
+    sourceSets {
+        main {
+            java {
+                srcDirs = ['src/main/java']
+            }
+        }
     }
 }
 
@@ -34,20 +52,21 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    
+
     // Firebase
     implementation 'com.google.firebase:firebase-auth'
     implementation 'com.google.firebase:firebase-firestore'
     implementation 'com.google.firebase:firebase-database'
     implementation 'com.google.firebase:firebase-messaging:23.4.1'
-    
+    implementation 'com.google.firebase:firebase-storage'
+
     // Google Sign In
     implementation 'com.google.android.gms:play-services-auth:20.7.0'
-    
+
     // Glide for image loading
     implementation 'com.github.bumptech.glide:glide:4.16.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
-    
+
     // Testing
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
@@ -57,4 +76,11 @@ dependencies {
 
     // iText PDF library
     implementation 'com.itextpdf:itextg:5.5.10'
-} 
+
+    // OkHttp for API requests
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+
+    // JavaMail for email sending (legacy)
+    implementation 'com.sun.mail:android-mail:1.6.7'
+    implementation 'com.sun.mail:android-activation:1.6.7'
+}

@@ -11,6 +11,7 @@ import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.PopupMenu;
 import android.widget.Toast;
 import android.widget.TextView;
 
@@ -28,11 +29,15 @@ import com.cloudinary.android.MediaManager;
 import com.cloudinary.android.callback.ErrorInfo;
 import com.cloudinary.android.callback.UploadCallback;
 import com.cloudinary.utils.ObjectUtils;
+import com.example.minuteburgers.utils.AppConfig;
+import com.example.minuteburgers.utils.DatabaseInitializer;
+import com.example.minuteburgers.utils.PermissionManager;
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -74,14 +79,16 @@ public class MainActivity extends AppCompatActivity {
     private ImageView imagePreview;
     private ActivityResultLauncher<String> imagePickerLauncher;
     private SearchView searchView;
-    private MaterialButton dashboardButton, reportsButton, staffButton;
-    private FloatingActionButton addItemButton;
+    private MaterialButton dashboardButton, reportsButton, staffButton, stockRequestButton, ownerDashboardButton;
+    private ExtendedFloatingActionButton addItemButton;
     private ImageButton logoutButton;
     private RecyclerView recyclerView;
     private InventoryAdapter adapter;
     private ValueEventListener inventoryListener;
     private TextView userNameText;
     private NotificationHelper notificationHelper;
+    private PermissionManager permissionManager;
+    private FirebaseFirestore db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -99,7 +106,11 @@ public class MainActivity extends AppCompatActivity {
             // Initialize Firebase
             FirebaseApp.initializeApp(this);
             mAuth = FirebaseAuth.getInstance();
+            db = FirebaseFirestore.getInstance();
             dbRef = FirebaseDatabase.getInstance().getReference("inventory");
+
+            // Initialize permission manager
+            permissionManager = PermissionManager.getInstance();
 
             // Enable disk persistence for this reference
             dbRef.keepSynced(true);
@@ -107,16 +118,19 @@ public class MainActivity extends AppCompatActivity {
             // Set database to maintain sync even when offline
             FirebaseDatabase.getInstance().getReference().keepSynced(true);
 
-            // Initialize Cloudinary
-            Map<String, String> config = new HashMap<>();
-            config.put("cloud_name", "djf2atu0h");
-            config.put("api_key", "216549336527232");
-            config.put("api_secret", "VxyHB2o9pzjfNpXQzWNFYfsSJ6I");
-            config.put("secure", "true");  // Force HTTPS
-            config.put("cloudinary_url", "cloudinary://216549336527232:VxyHB2o9pzjfNpXQzWNFYfsSJ6I@djf2atu0h");
-
+            // Initialize Cloudinary using centralized configuration
             try {
+                // Get configuration from AppConfig
+                Map<String, String> config = AppConfig.getCloudinaryConfig();
+
+                // Add cloudinary_url for backward compatibility
+                config.put("cloudinary_url", "cloudinary://" +
+                           AppConfig.CLOUDINARY_API_KEY + ":" +
+                           AppConfig.CLOUDINARY_API_SECRET + "@" +
+                           AppConfig.CLOUDINARY_CLOUD_NAME);
+
                 MediaManager.init(this, config);
+                Log.d(TAG, "Cloudinary initialized with cloud name: " + AppConfig.CLOUDINARY_CLOUD_NAME);
             } catch (IllegalStateException e) {
                 // If already initialized, just log it
                 Log.d(TAG, "Cloudinary already initialized");
@@ -141,6 +155,9 @@ public class MainActivity extends AppCompatActivity {
                 finish();
                 return;
             }
+
+            // Check if user is owner - if so, redirect to owner dashboard
+            checkUserRoleAndRedirect();
 
             // Initialize views and setup
             initializeViews();
@@ -192,7 +209,7 @@ public class MainActivity extends AppCompatActivity {
 
             // Initialize NotificationHelper
             notificationHelper = new NotificationHelper(this);
-            
+
             // Subscribe to relevant topics
             notificationHelper.subscribeToTopic("all");
             notificationHelper.subscribeToTopic("inventory_alerts");
@@ -219,13 +236,24 @@ public class MainActivity extends AppCompatActivity {
             dashboardButton = findViewById(R.id.dashboardButton);
             reportsButton = findViewById(R.id.reportsButton);
             staffButton = findViewById(R.id.staffButton);
+            stockRequestButton = findViewById(R.id.stockRequestButton);
+            ownerDashboardButton = findViewById(R.id.ownerDashboardButton);
             addItemButton = findViewById(R.id.addItemButton);
             userNameText = findViewById(R.id.userNameText);
             recyclerView = findViewById(R.id.recyclerView);
             imagePreview = findViewById(R.id.itemImagePreview);
+            logoutButton = findViewById(R.id.logoutButton);
 
             // Set click listener for username
-            userNameText.setOnClickListener(v -> handleLogout());
+            userNameText.setOnClickListener(v -> showUserOptionsMenu(v));
+
+            // Initially hide role-specific buttons until we know the user's role
+            if (stockRequestButton != null) {
+                stockRequestButton.setVisibility(View.GONE);
+            }
+            if (ownerDashboardButton != null) {
+                ownerDashboardButton.setVisibility(View.GONE);
+            }
 
             Log.d(TAG, "Views initialized successfully");
         } catch (Exception e) {
@@ -271,10 +299,39 @@ public class MainActivity extends AppCompatActivity {
             staffButton.setOnClickListener(v -> handleStaffList());
             addItemButton.setOnClickListener(v -> showAddDialog());
             logoutButton.setOnClickListener(v -> handleLogout());
+
+            // Set up role-specific button listeners
+            if (stockRequestButton != null) {
+                stockRequestButton.setOnClickListener(v -> handleStockRequest());
+            }
+            if (ownerDashboardButton != null) {
+                ownerDashboardButton.setOnClickListener(v -> handleOwnerDashboard());
+            }
+
             Log.d(TAG, "Click listeners setup complete");
         } catch (Exception e) {
             Log.e(TAG, "Error setting up click listeners: ", e);
             Toast.makeText(this, "Error setting up buttons", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void handleStockRequest() {
+        try {
+            Intent intent = new Intent(this, StockRequestActivity.class);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening stock request: ", e);
+            Toast.makeText(this, "Error opening stock request", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void handleOwnerDashboard() {
+        try {
+            Intent intent = new Intent(this, OwnerDashboardActivity.class);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening owner dashboard: ", e);
+            Toast.makeText(this, "Error opening owner dashboard", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -712,9 +769,9 @@ public class MainActivity extends AppCompatActivity {
         if (key != null) {
             item.setId(key);
             item.setLastUpdatedBy(mAuth.getCurrentUser().getEmail());
-            item.addHistoryEntry("Created", mAuth.getCurrentUser().getEmail(), 
+            item.addHistoryEntry("Created", mAuth.getCurrentUser().getEmail(),
                 "Item created with quantity: " + item.getQuantity());
-            
+
             dbRef.child(key).setValue(item)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Item added successfully", Toast.LENGTH_SHORT).show();
@@ -729,14 +786,14 @@ public class MainActivity extends AppCompatActivity {
     private void updateItemInDatabase(InventoryItem item) {
         if (item.getId() != null) {
             item.setLastUpdatedBy(mAuth.getCurrentUser().getEmail());
-            item.addHistoryEntry("Updated", mAuth.getCurrentUser().getEmail(), 
+            item.addHistoryEntry("Updated", mAuth.getCurrentUser().getEmail(),
                 "Item updated with new quantity: " + item.getQuantity());
-            
+
             // Check if inventory is low (less than 10 items)
             if (item.getQuantity() < 10) {
                 notificationHelper.sendLowInventoryNotification(item.getName(), item.getQuantity());
             }
-            
+
             dbRef.child(item.getId()).setValue(item)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Item updated successfully", Toast.LENGTH_SHORT).show();
@@ -760,9 +817,9 @@ public class MainActivity extends AppCompatActivity {
     private void deleteItemFromDatabase(InventoryItem item) {
         if (item.getId() != null) {
             item.setLastUpdatedBy(mAuth.getCurrentUser().getEmail());
-            item.addHistoryEntry("Deleted", mAuth.getCurrentUser().getEmail(), 
+            item.addHistoryEntry("Deleted", mAuth.getCurrentUser().getEmail(),
                 "Item deleted from inventory");
-            
+
             dbRef.child(item.getId()).removeValue()
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Item deleted successfully", Toast.LENGTH_SHORT).show();
@@ -774,7 +831,62 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Shows a popup menu with user options
+     */
+    private void showUserOptionsMenu(View anchorView) {
+        PopupMenu popupMenu = new PopupMenu(this, anchorView);
+        popupMenu.getMenuInflater().inflate(R.menu.user_menu, popupMenu.getMenu());
+
+        popupMenu.setOnMenuItemClickListener(item -> {
+            int itemId = item.getItemId();
+            if (itemId == R.id.menu_change_password) {
+                // Open change password activity
+                startActivity(new Intent(this, ChangePasswordActivity.class));
+                return true;
+            } else if (itemId == R.id.menu_logout) {
+                // Handle logout
+                handleLogout();
+                return true;
+            }
+            return false;
+        });
+
+        popupMenu.show();
+    }
+
+    private void checkUserRoleAndRedirect() {
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user != null) {
+            // Load user data from Firestore
+            db.collection("users").document(user.getUid())
+                    .get()
+                    .addOnSuccessListener(documentSnapshot -> {
+                        if (documentSnapshot.exists()) {
+                            String role = documentSnapshot.getString("role");
+
+                            // If user is owner, redirect to owner dashboard
+                            if (role != null && role.equals("owner")) {
+                                Log.d(TAG, "User is owner, redirecting to owner dashboard");
+                                startActivity(new Intent(MainActivity.this, OwnerDashboardActivity.class));
+                                finish();
+                            }
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Error checking user role", e);
+                    });
+        }
+    }
+
     private void checkAndInitializeDatabase() {
+        // Initialize the owner account in the database
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+
+        // Force create the owner account to ensure it always exists
+        DatabaseInitializer.forceCreateOwnerAccount(mAuth, db);
+
+        // Check if inventory database is empty
         dbRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -806,9 +918,26 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadUserName() {
+        if (mAuth.getCurrentUser() == null) {
+            Log.e(TAG, "No user logged in");
+            return;
+        }
+
         String userId = mAuth.getCurrentUser().getUid();
-        FirebaseFirestore.getInstance()
-            .collection("users")
+
+        // Load user permissions
+        permissionManager.loadUserPermissions(mAuth, db, success -> {
+            if (success) {
+                Log.d(TAG, "Permissions loaded successfully");
+                // Update UI based on permissions
+                updateUIBasedOnPermissions();
+            } else {
+                Log.e(TAG, "Failed to load permissions");
+            }
+        });
+
+        // Load user name
+        db.collection("users")
             .document(userId)
             .get()
             .addOnSuccessListener(documentSnapshot -> {
@@ -821,7 +950,57 @@ public class MainActivity extends AppCompatActivity {
             })
             .addOnFailureListener(e -> {
                 Log.e(TAG, "Error loading user name: ", e);
-        });
+            });
+    }
+
+    private void updateUIBasedOnPermissions() {
+        // Show/hide buttons based on permissions
+        if (ownerDashboardButton != null) {
+            ownerDashboardButton.setVisibility(
+                permissionManager.hasPermission(PermissionManager.ACCESS_OWNER_DASHBOARD)
+                ? View.VISIBLE : View.GONE);
+        }
+
+        if (stockRequestButton != null) {
+            stockRequestButton.setVisibility(
+                permissionManager.hasPermission(PermissionManager.REQUEST_STOCK)
+                ? View.VISIBLE : View.GONE);
+        }
+
+        if (staffButton != null) {
+            staffButton.setVisibility(
+                permissionManager.hasPermission(PermissionManager.MANAGE_STAFF)
+                ? View.VISIBLE : View.GONE);
+        }
+
+        if (addItemButton != null) {
+            addItemButton.setVisibility(
+                permissionManager.hasPermission(PermissionManager.MANAGE_INVENTORY)
+                ? View.VISIBLE : View.GONE);
+        }
+
+        // Update user name with role indicator
+        if (userNameText != null && userNameText.getText() != null) {
+            String currentText = userNameText.getText().toString();
+            String roleIndicator = permissionManager.isOwner() ? " (Owner)" : " (Employee)";
+
+            // Only add the role indicator if it's not already there
+            if (!currentText.contains("(Owner)") && !currentText.contains("(Employee)")) {
+                userNameText.setText(currentText + roleIndicator);
+            }
+        }
+
+        // Log the current permissions
+        Log.d(TAG, "User role: " + permissionManager.getUserRole());
+        Log.d(TAG, "Can access owner dashboard: " +
+            permissionManager.hasPermission(PermissionManager.ACCESS_OWNER_DASHBOARD));
+        Log.d(TAG, "Can request stock: " +
+            permissionManager.hasPermission(PermissionManager.REQUEST_STOCK));
+    }
+
+    // Keep this for backward compatibility
+    private void updateUIBasedOnRole() {
+        updateUIBasedOnPermissions();
     }
 
     @Override

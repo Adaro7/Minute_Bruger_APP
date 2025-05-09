@@ -12,6 +12,7 @@ public class InventoryItem {
     private int quantity;
     private String imageUrl;
     private String category;
+    private String branch; // Added branch field
     private long lastUpdated;
     private String lastUpdatedBy;
     private List<ItemHistory> history;
@@ -25,6 +26,16 @@ public class InventoryItem {
         this.name = name;
         this.quantity = quantity;
         this.category = category;
+        this.branch = "All Branches"; // Default branch
+        this.history = new ArrayList<>();
+        this.lastUpdated = System.currentTimeMillis();
+    }
+
+    public InventoryItem(String name, int quantity, String category, String branch) {
+        this.name = name;
+        this.quantity = quantity;
+        this.category = category;
+        this.branch = branch;
         this.history = new ArrayList<>();
         this.lastUpdated = System.currentTimeMillis();
     }
@@ -44,6 +55,9 @@ public class InventoryItem {
 
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
+
+    public String getBranch() { return branch; }
+    public void setBranch(String branch) { this.branch = branch; }
 
     public long getLastUpdated() { return lastUpdated; }
     public void setLastUpdated(long lastUpdated) { this.lastUpdated = lastUpdated; }
@@ -116,4 +130,4 @@ public class InventoryItem {
             this.timestamp = timestamp;
         }
     }
-} 
+}

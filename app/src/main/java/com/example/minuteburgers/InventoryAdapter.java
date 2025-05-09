@@ -27,6 +27,7 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
     private Context context;
     private List<InventoryItem> items;
     private OnItemClickListener listener;
+    private boolean employeeMode = false; // Default to owner mode
 
     public interface OnItemClickListener {
         void onItemClick(InventoryItem item);
@@ -56,7 +57,7 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
         InventoryItem item = items.get(position);
         holder.itemName.setText(item.getName());
         holder.itemQuantity.setText("Qty: " + item.getQuantity());
-        
+
         // Load image using Glide with improved error handling and logging
         if (item.getImageUrl() != null && !item.getImageUrl().isEmpty()) {
             Log.d("InventoryAdapter", "Loading image URL: " + item.getImageUrl());
@@ -100,17 +101,28 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
             }
         });
 
-        holder.editButton.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onEditClick(item);
-            }
-        });
+        // Show or hide edit/delete buttons based on mode
+        if (employeeMode) {
+            // Employee mode - hide edit and delete buttons
+            holder.editButton.setVisibility(View.GONE);
+            holder.deleteButton.setVisibility(View.GONE);
+        } else {
+            // Owner mode - show edit and delete buttons
+            holder.editButton.setVisibility(View.VISIBLE);
+            holder.deleteButton.setVisibility(View.VISIBLE);
 
-        holder.deleteButton.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onDeleteClick(item);
-            }
-        });
+            holder.editButton.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onEditClick(item);
+                }
+            });
+
+            holder.deleteButton.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onDeleteClick(item);
+                }
+            });
+        }
     }
 
     @Override
@@ -120,6 +132,15 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
 
     public void updateItems(List<InventoryItem> newItems) {
         this.items = newItems;
+        notifyDataSetChanged();
+    }
+
+    /**
+     * Set the adapter to employee mode (view only) or owner mode (with edit/delete)
+     * @param employeeMode true for employee mode, false for owner mode
+     */
+    public void setEmployeeMode(boolean employeeMode) {
+        this.employeeMode = employeeMode;
         notifyDataSetChanged();
     }
 
@@ -139,4 +160,4 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.View
             deleteButton = itemView.findViewById(R.id.deleteButton);
         }
     }
-} 
+}

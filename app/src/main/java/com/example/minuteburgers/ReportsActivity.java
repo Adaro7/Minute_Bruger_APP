@@ -24,6 +24,8 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.example.minuteburgers.utils.EmailService;
+import com.example.minuteburgers.utils.PDFReportGenerator;
 import com.itextpdf.text.Document;
 import com.itextpdf.text.Element;
 import com.itextpdf.text.Font;
@@ -230,97 +232,226 @@ public class ReportsActivity extends AppCompatActivity {
             return;
         }
 
-        File pdfFile = null;
-        FileOutputStream fos = null;
-        Document document = null;
+        // Show confirmation dialog
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Send Report")
+            .setMessage("Would you like to generate and email the inventory report?\n\n" +
+                    "Date Range: " + selectedDateRange + "\n" +
+                    "User Filter: " + selectedUser)
+            .setPositiveButton("Yes, Send Report", (dialog, which) -> {
+                // Show progress dialog
+                androidx.appcompat.app.AlertDialog progressDialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Generating Report")
+                    .setMessage("Please wait while we generate your report...")
+                    .setCancelable(false)
+                    .create();
+                progressDialog.show();
 
-        try {
-            // Create PDF file in cache directory
-            pdfFile = new File(getCacheDir(), "inventory_report.pdf");
-            fos = new FileOutputStream(pdfFile);
-            document = new Document(PageSize.A4);
-            PdfWriter.getInstance(document, fos);
-
-            document.open();
-            
-            // Add logo and title
-            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
-            Paragraph title = new Paragraph("Minute Burgers Inventory Report", titleFont);
-            title.setAlignment(Element.ALIGN_CENTER);
-            title.setSpacingAfter(20);
-            document.add(title);
-
-            // Add report info
-            Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 12);
-            Font boldFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
-            
-            Paragraph info = new Paragraph();
-            info.add(new Phrase("Generated for: ", boldFont));
-            info.add(new Phrase(currentUserEmail + "\n", normalFont));
-            info.add(new Phrase("Date Range: ", boldFont));
-            info.add(new Phrase(selectedDateRange + "\n", normalFont));
-            document.add(info);
-
-            // Create table
-            PdfPTable table = new PdfPTable(5);
-            table.setWidthPercentage(100);
-            float[] columnWidths = {2f, 1.5f, 2f, 3f, 2f};
-            table.setWidths(columnWidths);
-
-            // Add headers
-            String[] headers = {"Item", "Action", "Details", "Time"};
-            for (String header : headers) {
-                PdfPCell cell = new PdfPCell(new Phrase(header, boldFont));
-                cell.setBackgroundColor(new com.itextpdf.text.BaseColor(255, 140, 0));
-                cell.setPadding(8);
-                table.addCell(cell);
-            }
-
-            // Add data
-            SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
-            List<ReportsAdapter.ReportItem> reports = reportsAdapter.getReports();
-            if (reports.isEmpty()) {
-                document.add(new Paragraph("No reports found for the selected filters.", normalFont));
-            } else {
-                for (ReportsAdapter.ReportItem item : reports) {
-                    table.addCell(new Phrase(item.getItemName(), normalFont));
-                    table.addCell(new Phrase(item.getAction(), normalFont));
-                    table.addCell(new Phrase(item.getDetails(), normalFont));
-                    table.addCell(new Phrase(sdf.format(new Date(item.getTimestamp())), normalFont));
-                }
-                document.add(table);
-            }
-
-            document.close();
-
-            // Create email intent with PDF attachment
-            Uri pdfUri = FileProvider.getUriForFile(this, 
-                "com.example.minuteburgers.fileprovider", pdfFile);
-
-            Intent emailIntent = new Intent(Intent.ACTION_SEND);
-            emailIntent.setType("application/pdf");
-            emailIntent.putExtra(Intent.EXTRA_EMAIL, new String[]{currentUserEmail});
-            emailIntent.putExtra(Intent.EXTRA_SUBJECT, "Minute Burgers Inventory Report");
-            emailIntent.putExtra(Intent.EXTRA_TEXT, "Please find attached the inventory report.");
-            emailIntent.putExtra(Intent.EXTRA_STREAM, pdfUri);
-            emailIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-            startActivity(Intent.createChooser(emailIntent, "Send report via..."));
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error creating PDF: " + e.getMessage(), e);
-            Toast.makeText(this, "Error creating PDF: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        } finally {
-            if (document != null && document.isOpen()) {
-                document.close();
-            }
-            if (fos != null) {
-                try {
-                    fos.close();
-                } catch (IOException e) {
-                    Log.e(TAG, "Error closing file stream", e);
-                }
-            }
-        }
+                // Generate and send report in a background thread
+                new Thread(() -> {
+                    generateAndSendReport(currentUserEmail, progressDialog);
+                }).start();
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
     }
-} 
+
+    private void generateAndSendReport(String currentUserEmail, androidx.appcompat.app.AlertDialog progressDialog) {
+        // Create a separate thread for PDF generation and email sending
+        new Thread(() -> {
+            File pdfFile = null;
+            FileOutputStream fos = null;
+            Document document = null;
+
+            try {
+                // Create PDF file in cache directory
+                pdfFile = new File(getCacheDir(), "inventory_report.pdf");
+                fos = new FileOutputStream(pdfFile);
+                document = new Document(PageSize.A4);
+                PdfWriter.getInstance(document, fos);
+
+                document.open();
+
+                // Add logo and title
+                Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
+                Paragraph title = new Paragraph("Minute Burgers Inventory Report", titleFont);
+                title.setAlignment(Element.ALIGN_CENTER);
+                title.setSpacingAfter(20);
+                document.add(title);
+
+                // Add report info
+                Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 12);
+                Font boldFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
+
+                Paragraph info = new Paragraph();
+                info.add(new Phrase("Generated for: ", boldFont));
+                info.add(new Phrase(currentUserEmail + "\n", normalFont));
+                info.add(new Phrase("Date Range: ", boldFont));
+                info.add(new Phrase(selectedDateRange + "\n", normalFont));
+                info.add(new Phrase("User Filter: ", boldFont));
+                info.add(new Phrase(selectedUser + "\n", normalFont));
+                info.add(new Phrase("Generated on: ", boldFont));
+                info.add(new Phrase(new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(new Date()) + "\n\n", normalFont));
+                document.add(info);
+
+                // Create table
+                PdfPTable table = new PdfPTable(4); // 4 columns
+                table.setWidthPercentage(100);
+                float[] columnWidths = {2f, 1.5f, 3f, 2f};
+                table.setWidths(columnWidths);
+
+                // Add headers
+                String[] headers = {"Item", "Action", "Details", "Time"};
+                for (String header : headers) {
+                    PdfPCell cell = new PdfPCell(new Phrase(header, boldFont));
+                    cell.setBackgroundColor(new com.itextpdf.text.BaseColor(255, 140, 0));
+                    cell.setPadding(8);
+                    table.addCell(cell);
+                }
+
+                // Get reports on the current thread
+                List<ReportsAdapter.ReportItem> reports = new ArrayList<>();
+                runOnUiThread(() -> {
+                    reports.addAll(reportsAdapter.getReports());
+                });
+
+                // Wait for the UI thread to complete
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Log.e(TAG, "Thread interrupted", e);
+                }
+
+                // Add data
+                SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
+                if (reports.isEmpty()) {
+                    document.add(new Paragraph("No reports found for the selected filters.", normalFont));
+                } else {
+                    for (ReportsAdapter.ReportItem item : reports) {
+                        table.addCell(new Phrase(item.getItemName(), normalFont));
+                        table.addCell(new Phrase(item.getAction(), normalFont));
+                        table.addCell(new Phrase(item.getDetails(), normalFont));
+                        table.addCell(new Phrase(sdf.format(new Date(item.getTimestamp())), normalFont));
+                    }
+                    document.add(table);
+                }
+
+                document.close();
+
+                // Close the output stream
+                if (fos != null) {
+                    fos.close();
+                }
+
+                // Automatically download the report to Downloads folder
+                boolean downloadSuccess = PDFReportGenerator.autoDownloadPdf(ReportsActivity.this, pdfFile);
+
+                if (downloadSuccess) {
+                    // Show download success message on UI thread
+                    runOnUiThread(() -> {
+                        Toast.makeText(ReportsActivity.this,
+                            "Report downloaded to Downloads folder",
+                            Toast.LENGTH_LONG).show();
+                    });
+                }
+
+                // Email content
+                final String emailSubject = "Minute Burgers Inventory Report - " + selectedDateRange;
+                final String emailBody = "Please find attached the inventory report for " + selectedDateRange +
+                        " filtered by " + selectedUser + ".\n\nGenerated on: " +
+                        new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(new Date()) +
+                        "\n\nThis email was sent automatically from minuteburger@email.com" +
+                        "\n\nNote: This report has also been automatically downloaded to your device's Downloads folder.";
+
+                // Get a final reference to the PDF file
+                final File finalPdfFile = pdfFile;
+
+                // Update progress dialog on UI thread
+                runOnUiThread(() -> {
+                    progressDialog.setMessage("Sending report to " + currentUserEmail + " from minuteburger@email.com...");
+                });
+
+                // Send email with attachment
+                EmailService.sendEmailWithAttachment(ReportsActivity.this, currentUserEmail, emailSubject, emailBody, finalPdfFile,
+                    new EmailService.EmailCallback() {
+                        @Override
+                        public void onSuccess() {
+                            runOnUiThread(() -> {
+                                progressDialog.dismiss();
+
+                                // Show success message
+                                Toast.makeText(ReportsActivity.this,
+                                    "Report sent successfully to " + currentUserEmail + " from minuteburger@email.com",
+                                    Toast.LENGTH_LONG).show();
+                            });
+                        }
+
+                        @Override
+                        public void onFailure(String errorMessage) {
+                            runOnUiThread(() -> {
+                                progressDialog.dismiss();
+
+                                // Show error message
+                                Toast.makeText(ReportsActivity.this,
+                                    "Failed to send email: " + errorMessage,
+                                    Toast.LENGTH_LONG).show();
+                                Log.e(TAG, "Error sending report email: " + errorMessage);
+
+                                // Try to download the report if not already done
+                                if (!downloadSuccess) {
+                                    boolean fallbackDownload = PDFReportGenerator.autoDownloadPdf(ReportsActivity.this, finalPdfFile);
+                                    if (fallbackDownload) {
+                                        Toast.makeText(ReportsActivity.this,
+                                            "Report downloaded to Downloads folder",
+                                            Toast.LENGTH_LONG).show();
+                                    }
+                                }
+
+                                // Fallback to the device's email client
+                                try {
+                                    Uri pdfUri = FileProvider.getUriForFile(ReportsActivity.this,
+                                        "com.example.minuteburgers.fileprovider", finalPdfFile);
+
+                                    Intent emailIntent = new Intent(Intent.ACTION_SEND);
+                                    emailIntent.setType("application/pdf");
+                                    emailIntent.putExtra(Intent.EXTRA_EMAIL, new String[]{currentUserEmail});
+                                    emailIntent.putExtra(Intent.EXTRA_SUBJECT, emailSubject);
+                                    emailIntent.putExtra(Intent.EXTRA_TEXT, emailBody);
+                                    emailIntent.putExtra(Intent.EXTRA_STREAM, pdfUri);
+                                    emailIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                                    startActivity(Intent.createChooser(emailIntent, "Send report via..."));
+                                } catch (Exception e) {
+                                    Log.e(TAG, "Fallback email sending also failed", e);
+                                    Toast.makeText(ReportsActivity.this,
+                                        "Could not send email. Report saved to Downloads folder.",
+                                        Toast.LENGTH_LONG).show();
+                                }
+                            });
+                        }
+                    });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error creating PDF: " + e.getMessage(), e);
+
+                // Show error on UI thread
+                runOnUiThread(() -> {
+                    progressDialog.dismiss();
+                    Toast.makeText(ReportsActivity.this, "Error creating PDF: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+
+                // Close resources
+                if (document != null && document.isOpen()) {
+                    document.close();
+                }
+                if (fos != null) {
+                    try {
+                        fos.close();
+                    } catch (IOException ioException) {
+                        Log.e(TAG, "Error closing file stream", ioException);
+                    }
+                }
+            }
+        }).start();
+    }
+}
